@@ -35,7 +35,20 @@ def compute_epe_error(pred_flow: torch.Tensor, gt_flow: torch.Tensor):
     '''
     epe = torch.mean(torch.mean(torch.norm(pred_flow - gt_flow, p=2, dim=1), dim=(1, 2)), dim=0)
     return epe
-
+"""
+def compute_multiscale_loss(pred_flows, gt_flow):
+    '''
+    pred_flows: Dict[str, torch.Tensor], 各中間層の予測オプティカルフローデータ
+    gt_flow: torch.Tensor, Shape: [B, 2, 480, 640], 正解オプティカルフローデータ
+    '''
+    total_loss = 0
+    for flow in pred_flows.values():
+        # 各中間フローを正解フローのサイズにリサイズ
+        flow_resized = torch.nn.functional.interpolate(flow, size=gt_flow.shape[2:], mode='bilinear', align_corners=True)
+        epe = compute_epe_error(flow_resized, gt_flow)
+        total_loss += epe
+    return total_loss
+"""
 def save_optical_flow_to_npy(flow: torch.Tensor, file_name: str):
     '''
     optical flowをnpyファイルに保存
@@ -128,6 +141,10 @@ def main(args: DictConfig):
             event_image = batch["event_volume"].to(device) # [B, 4, 480, 640]
             ground_truth_flow = batch["flow_gt"].to(device) # [B, 2, 480, 640]
             flow = model(event_image) # [B, 2, 480, 640]
+            #outputs=model(event_image)# [B, 2, 480, 640]
+            #intermediate_flows=outputs
+            # 損失を計算
+            #loss: torch.Tensor = compute_multiscale_loss(intermediate_flows, ground_truth_flow)
             loss: torch.Tensor = compute_epe_error(flow, ground_truth_flow)
             print(f"batch {i} loss: {loss.item()}")
             optimizer.zero_grad()
@@ -156,8 +173,10 @@ def main(args: DictConfig):
         print("start test")
         for batch in tqdm(test_data):
             batch: Dict[str, Any]
-            event_image = batch["event_volume_old"].to(device)
+            event_image = batch["event_volume"].to(device)
             batch_flow = model(event_image) # [1, 2, 480, 640]
+            #if isinstance(batch_flow, dict):
+                #batch_flow = batch_flow['flow3']  # 正しいキーを使う
             flow = torch.cat((flow, batch_flow), dim=0)  # [N, 2, 480, 640]
         print("test done")
     # ------------------

@@ -506,7 +506,7 @@ class SequenceRecurrent(Sequence):
                 self.timestamps_flow[self.valid_indices[idx]]))
         else:
             sequence[0]['new_sequence'] = 0
-
+        
         # random crop
         if self.crop_size is not None:
             i, j, h, w = RandomCrop.get_params(
@@ -610,3 +610,29 @@ def rec_train_collate(sample_list):
         seq_of_batch.append(train_collate(
             [sample[i] for sample in sample_list]))
     return seq_of_batch
+import torch
+from torch.utils.data import Dataset
+
+class MyDataset(Dataset):
+    def __init__(self, data, sequence_length=1):
+        self.data = data
+        self.sequence_length = sequence_length
+
+    def __len__(self):
+        return len(self.data) - self.sequence_length
+
+    def __getitem__(self, idx):
+        return self.get_data_sample(idx)
+
+    def get_data_sample(self, idx):
+        sequence = []
+        for i in range(self.sequence_length):
+            # Modify this part to get multiple frames as input
+            frame = self.data[idx + i]  # Assuming data is a list of frames
+            sequence.append(frame)
+        return torch.stack(sequence)  # Assuming frames are tensors
+
+
+
+
+
